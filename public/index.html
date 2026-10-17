@@ -7,8 +7,6 @@
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Helvetica Neue', Arial, sans-serif; }
         body { background-color: #7494c0; display: flex; height: 100vh; }
-        
-        /* サイドバー（ユーザー一覧） */
         #sidebar { width: 250px; background-color: #ffffff; border-right: 1px solid #ddd; display: flex; flex-direction: column; }
         #login-area { padding: 15px; border-bottom: 1px solid #eee; background-color: #f6f6f6; }
         #login-area input { width: 100%; padding: 8px; margin-bottom: 8px; border: 1px solid #ccc; border-radius: 4px; }
@@ -16,51 +14,36 @@
         #login-area button:hover { background-color: #05b34c; }
         #user-info { display: none; padding: 10px; background-color: #e8f5e9; border-radius: 4px; margin-bottom: 5px; font-size: 14px; }
         #logout-btn { background-color: #e53935 !important; margin-top: 5px; }
-        
         #room-list-title { padding: 10px 15px; font-size: 12px; color: #777; font-weight: bold; }
         #user-list { list-style: none; overflow-y: auto; flex: 1; }
         #user-list li { padding: 12px 15px; cursor: pointer; border-bottom: 1px solid #f9f9f9; font-size: 15px; transition: 0.2s; }
         #user-list li:hover { background-color: #f0f0f0; }
         #user-list li.active { background-color: #e2f0d9; font-weight: bold; }
-
-        /* チャットエリア */
         #chat-area { flex: 1; display: flex; flex-direction: column; background-color: #7494c0; }
         #chat-header { background-color: #ffffff; padding: 15px; font-size: 16px; font-weight: bold; border-bottom: 1px solid #ddd; }
         #chat-messages { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
-        
-        /* 吹き出しのスタイル */
         .msg { display: flex; flex-direction: column; max-width: 70%; font-size: 14px; }
         .msg .sender { font-size: 11px; color: #fff; margin-bottom: 2px; }
         .msg .text { padding: 8px 12px; border-radius: 12px; word-break: break-all; position: relative; }
         .msg .time { font-size: 10px; color: #eee; margin-top: 2px; align-self: flex-end; }
-        
-        /* 自分からのメッセージ */
         .msg.me { align-self: flex-end; }
         .msg.me .sender { display: none; }
         .msg.me .text { background-color: #53b642; color: #fff; border-top-right-radius: 2px; }
         .msg.me .time { color: #dfdfdf; }
-        
-        /* 相手からのメッセージ */
         .msg.other { align-self: flex-start; }
         .msg.other .text { background-color: #ffffff; color: #000; border-top-left-radius: 2px; }
         .msg.other .time { color: #555; align-self: flex-start; }
-
-        /* フッター（入力欄） */
         #chat-footer { padding: 10px; background-color: #ffffff; display: flex; gap: 10px; }
         #chat-footer input { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 4px; outline: none; }
         #chat-footer button { padding: 10px 20px; background-color: #06c755; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; }
         #chat-footer button:disabled { background-color: #cccccc; cursor: not-allowed; }
-        
         .placeholder-text { text-align: center; color: #fff; margin-top: 40vh; font-size: 16px; }
     </style>
-    <!-- Socket.ioのクライアントライブラリを読み込み -->
-    <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
 
     <!-- サイドバー -->
     <div id="sidebar">
-        <!-- ログイン・マイIDエリア -->
         <div id="login-area">
             <div id="login-form">
                 <input type="text" id="user-id-input" placeholder="マイIDを入力してね">
@@ -71,11 +54,8 @@
                 <button id="logout-btn" onclick="logout()">ログアウト</button>
             </div>
         </div>
-
         <div id="room-list-title">トークルーム一覧</div>
-        <ul id="user-list">
-            <!-- オンラインのユーザーがここに並びます -->
-        </ul>
+        <ul id="user-list"></ul>
     </div>
 
     <!-- チャットメインエリア -->
@@ -90,25 +70,39 @@
         </div>
     </div>
 
+    <!-- 通信ライブラリを一番下で確実に読み込む -->
+    <script src="/socket.io/socket.io.js"></script>
+
     <script>
-        // サーバーに接続
+        // エラーが起きたら画面にポップアップを出す設定
+        window.onerror = function(message, source, lineno, colno, error) {
+            alert("エラーが発生しました:\n" + message + "\n行番号: " + lineno);
+            return false;
+        };
+
+        // Socket.ioが正しく読み込めているかチェック
+        if (typeof io === 'undefined') {
+            alert("警告: サーバーから通信ライブラリ(Socket.io)を読み込めませんでした。Render側の反映が終わっていない可能性があります。");
+        }
+
         const socket = io();
         let myId = '';
         let activeChatUser = '';
 
-        // ログインを実行する関数
         function login() {
-            const input = document.getElementById('user-id-input');
-            const id = input.value.trim();
-            if (!id) {
-                alert('IDを入力してください！');
-                return;
+            try {
+                const input = document.getElementById('user-id-input');
+                const id = input.value.trim();
+                if (!id) {
+                    alert('IDを入力してください！');
+                    return;
+                }
+                socket.emit('login', id);
+            } catch (e) {
+                alert("ログインボタンの処理でエラー: " + e.message);
             }
-            // サーバーにログインシグナルを送る
-            socket.emit('login', id);
         }
 
-        // サーバーからログイン成功を受け取った時の処理
         socket.on('login_success', (id) => {
             myId = id;
             document.getElementById('login-form').style.display = 'none';
@@ -120,13 +114,11 @@
             document.getElementById('chat-messages').innerHTML = '<div class="placeholder-text">話したい相手をリストから選んでトークを開始してね</div>';
         });
 
-        // オンラインユーザーの一覧が更新された時
         socket.on('user_list', (userList) => {
             const listElement = document.getElementById('user-list');
             listElement.innerHTML = '';
 
             userList.forEach(userId => {
-                // 自分自身はリストに表示しない
                 if (userId === myId) return;
 
                 const li = document.createElement('li');
@@ -134,31 +126,24 @@
                 if (userId === activeChatUser) {
                     li.classList.add('active');
                 }
-                // クリックしたらその人とチャットを開始
                 li.onclick = () => selectUser(userId, li);
                 listElement.appendChild(li);
             });
             
-            // チャット相手がログアウトした場合はヘッダーを戻す
             if (activeChatUser && !userList.includes(activeChatUser)) {
                 document.getElementById('chat-header').textContent = `${activeChatUser} さんはオフラインになりました`;
                 activeChatUser = '';
             }
         });
 
-        // チャットする相手を選択した時
         function selectUser(userId, element) {
             activeChatUser = userId;
-            
-            // アクティブなスタイルの切り替え
             document.querySelectorAll('#user-list li').forEach(li => li.classList.remove('active'));
             element.classList.add('active');
-
             document.getElementById('chat-header').textContent = `トーク相手: ${userId}`;
-            document.getElementById('chat-messages').innerHTML = ''; // 画面をクリア
+            document.getElementById('chat-messages').innerHTML = '';
         }
 
-        // メッセージを送信する関数
         function sendMessage() {
             const input = document.getElementById('message-input');
             const message = input.value.trim();
@@ -169,7 +154,6 @@
             }
             if (!message) return;
 
-            // サーバーにメッセージを送信
             socket.emit('send_message', {
                 to: activeChatUser,
                 message: message
@@ -178,27 +162,20 @@
             input.value = '';
         }
 
-        // エンターキーでも送信できるようにする
         function handleKeyPress(event) {
             if (event.key === 'Enter') {
                 sendMessage();
             }
         }
 
-        // メッセージを受信した時の処理
         socket.on('receive_message', (data) => {
-            // 自分宛て、または自分が送ったメッセージで、かつ現在開いているトーク相手とのやり取りの場合のみ画面に表示
             if ((data.from === activeChatUser && activeChatUser) || data.from === myId) {
                 const messagesContainer = document.getElementById('chat-messages');
-                
-                // プレースホルダーの文字を消す
                 const placeholder = messagesContainer.querySelector('.placeholder-text');
                 if (placeholder) placeholder.remove();
 
                 const msgDiv = document.createElement('div');
-                msgDiv.classList.add('msg');
-                // 自分が送ったか相手が送ったかでクラスを分岐
-                msgDiv.classList.add(data.from === myId ? 'me' : 'other');
+                msgDiv.classList.add('msg', data.from === myId ? 'me' : 'other');
 
                 msgDiv.innerHTML = `
                     <div class="sender">${data.from}</div>
@@ -207,12 +184,10 @@
                 `;
 
                 messagesContainer.appendChild(msgDiv);
-                // 一番下まで自動スクロール
                 messagesContainer.scrollTop = messagesContainer.scrollHeight;
             }
         });
 
-        // ログアウト処理
         function logout() {
             socket.emit('logout');
             myId = '';
@@ -227,3 +202,6 @@
             document.getElementById('chat-header').textContent = '👈 左のリストから話したい相手を選んでね';
             document.getElementById('chat-messages').innerHTML = '<div class="placeholder-text">チャットを始めるにはログインしてください</div>';
         }
+    </script>
+</body>
+</html>
