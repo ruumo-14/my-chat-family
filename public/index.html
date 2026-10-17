@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>リアルタイムチャット</title>
+    <style>
+        body { font-family: sans-serif; margin: 0; padding: 20px; background: #f0f2f5; }
+        .container { max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .hidden { display: none !important; }
+        input, select, button { width: 100%; padding: 10px; margin-bottom: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+        button { background: #007bff; color: white; border: none; cursor: pointer; font-weight: bold; }
+        button:hover { background: #0056b3; }
+        #chat-box { border: 1px solid #ddd; height: 300px; overflow-y: scroll; padding: 10px; margin-bottom: 10px; background: #fafafa; border-radius: 4px; }
+        .message { margin-bottom: 10px; padding: 8px; border-radius: 4px; background: #e9ecef; }
+        .message .meta { font-size: 0.8em; color: #666; margin-bottom: 4px; }
+        .system { text-align: center; color: #888; font-style: italic; font-size: 0.9em; margin: 8px 0; }
+        .flex-box { display: flex; gap: 10px; }
+        .flex-box input { flex: 1; margin-bottom: 0; }
+        .flex-box button { width: auto; margin-bottom: 0; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- 1. ログイン画面 -->
+    <div id="login-screen">
+        <h2>⚔ チャットを始めよう</h2>
+        <input type="text" id="username" placeholder="ユーザー名を入力してください" required>
+        <select id="room">
+            <option value="ロビー">ロビー（全体雑談）</option>
+            <option value="初心者街">初心者街</option>
+            <option value="ダンジョンエリア">ダンジョンエリア</option>
+        </select>
+        <button id="join-btn">入室する</button>
+    </div>
+
+    <!-- 2. チャット画面 -->
+    <div id="chat-screen" class="hidden">
+        <h2 id="room-title">部屋: </h2>
+        <div id="chat-box"></div>
+        <div class="flex-box">
+            <input type="text" id="message-input" placeholder="メッセージを入力...">
+            <button id="send-btn">送信</button>
+        </div>
+    </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+    const socket = io();
+
+    const loginScreen = document.getElementById('login-screen');
+    const chatScreen = document.getElementById('chat-screen');
+    const usernameInput = document.getElementById('username');
+    const roomSelect = document.getElementById('room');
+    const joinBtn = document.getElementById('join-btn');
+    const roomTitle = document.getElementById('room-title');
+    const chatBox = document.getElementById('chat-box');
+    const messageInput = document.getElementById('message-input');
+    const sendBtn = document.getElementById('send-btn');
+
+    let currentUsername = '';
+
+    joinBtn.addEventListener('click', () => {
+        const username = usernameInput.value.trim();
+        const room = roomSelect.value;
+
+        if (!username) return alert('ユーザー名を入力してください！');
+
+        currentUsername = username;
+        roomTitle.innerText = `部屋: ${room} (ユーザー: ${username})`;
+
+        loginScreen.classList.add('hidden');
+        chatScreen.classList.remove('hidden');
+
+        socket.emit('joinRoom', { username, room });
+    });
+
+    function sendMessage() {
+        const text = messageInput.value.trim();
+        if (text) {
+            socket.emit('chatMessage', text);
+            messageInput.value = '';
+            messageInput.focus();
+        }
+    }
+    sendBtn.addEventListener('click', sendMessage);
+    messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
+
+    socket.on('chatMessage', (data) => {
+        const div = document.createElement('div');
+        div.classList.add('message');
+        div.innerHTML = `<div class="meta">${data.username} <span>[${data.time}]</span></div><div>${data.text}</div>`;
+        chatBox.appendChild(div);
+        chatBox.scrollTop = chatBox.scrollHeight;
+    });
+
+    socket.on('systemMessage', (text) => {
+        const div = document.createElement('div');
+        div.classList.add('system');
+        div.innerText = text;
+        chatBox.appendChild(div);
+        chatBox.scrollTop = chatBox.scrollHeight;
+    });
+</script>
+</body>
+</html>
