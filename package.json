@@ -1,7 +1,7 @@
 {
-  "name": "realtime-chat-app",
+  "name": "line-like-private-chat",
   "version": "1.0.0",
-  "description": "A realtime chat application with rooms",
+  "description": "A private 1-on-1 chat application",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
