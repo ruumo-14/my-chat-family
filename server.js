@@ -1,58 +1,79 @@
 const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
+const path = require('path');
+
 const app = express();
-const http = require('http').createServer(app);
-const io = require('socket.io')(http);
+const server = http.createServer(app);
+const io = new Server(server);
 
-const PORT = process.env.PORT || 3000;
+// 静的ファイル（publicフォルダ内）を配信する設定
+app.use(express.static(path.join(__dirname, 'public')));
 
-app.use(express.static('public'));
-
-const onlineUsers = {};
-const messageDb = []; 
+// ユーザーのオンライン状態を管理
+const users = new Map();
 
 io.on('connection', (socket) => {
-    console.log('接続されました:', socket.id);
+    console.log('ユーザーが接続しました:', socket.id);
 
-    socket.on('login', (username) => {
-        if (Object.values(onlineUsers).includes(username)) {
-            socket.emit('loginResult', { success: false, message: 'そのユーザーIDは既に使用されています。' });
-            return;
-        }
-
-        onlineUsers[socket.id] = username;
-        socket.emit('loginResult', { success: true, username: username });
-
-        const myHistory = messageDb.filter(msg => msg.fromUser === username || msg.toUser === username);
-        socket.emit('loadChatHistory', myHistory);
-
-        io.emit('userList', Object.values(onlineUsers));
-    });
-
-    socket.on('privateMessage', ({ toUser, text }) => {
-        const fromUser = onlineUsers[socket.id];
-        if (!fromUser) return;
-
-        const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        const newMsg = { fromUser, toUser, text, time };
+    // ログイン処理
+    socket.on('login', (userId) => {
+        if (!userId) return;
         
-        messageDb.push(newMsg);
-
-        const toSocketId = Object.keys(onlineUsers).find(key => onlineUsers[key] === toUser);
-        if (toSocketId) {
-            io.to(toSocketId).emit('receivePrivateMessage', newMsg);
-        }
-        socket.emit('receivePrivateMessage', newMsg);
+        // ソケットIDとマイIDを紐付け
+        socket.userId = userId;
+        users.set(userId, socket.id);
+        
+        // ログイン成功を本人に通知
+        socket.emit('login_success', userId);
+        
+        // 全員に最新のオンラインユーザーリストを送信
+        io.emit('user_list', Array.from(users.keys()));
+        console.log(`ユーザーログイン: ${userId}`);
     });
 
+    // メッセージの送信処理
+    socket.on('send_message', (data) => {
+        const { to, message } = data;
+        const targetSocketId = users.get(to);
+
+        const payload = {
+            from: socket.userId,
+            message: message,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+
+        // 送信元（自分）にメッセージを届ける
+        socket.emit('receive_message', payload);
+
+        // 送信先（相手）がオンラインなら届ける
+        if (targetSocketId) {
+            io.to(targetSocketId).emit('receive_message', payload);
+        }
+    });
+
+    // ログアウト処理
+    socket.on('logout', () => {
+        if (socket.userId) {
+            users.delete(socket.userId);
+            io.emit('user_list', Array.from(users.keys()));
+            console.log(`ユーザーログアウト: ${socket.userId}`);
+            socket.userId = null;
+        }
+    });
+
+    // 切断時の処理
     socket.on('disconnect', () => {
-        const username = onlineUsers[socket.id];
-        if (username) {
-            delete onlineUsers[socket.id];
-            io.emit('userList', Object.values(onlineUsers));
+        if (socket.userId) {
+            users.delete(socket.userId);
+            io.emit('user_list', Array.from(users.keys()));
+            console.log('ユーザーが切断しました:', socket.userId);
         }
     });
 });
 
-http.listen(PORT, () => {
-    console.log(`サーバーが起動しました。ポート: ${PORT}`);
+// Renderなどの環境変数のポート、または3000番で起動
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
 });
