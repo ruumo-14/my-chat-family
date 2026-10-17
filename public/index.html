@@ -3,106 +3,209 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>リアルタイムチャット</title>
+    <title>LINE風 プライベートチャット</title>
     <style>
-        body { font-family: sans-serif; margin: 0; padding: 20px; background: #f0f2f5; }
-        .container { max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; margin: 0; padding: 0; background: #cbd4e1; h-overflow: hidden; }
         .hidden { display: none !important; }
-        input, select, button { width: 100%; padding: 10px; margin-bottom: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
-        button { background: #007bff; color: white; border: none; cursor: pointer; font-weight: bold; }
-        button:hover { background: #0056b3; }
-        #chat-box { border: 1px solid #ddd; height: 300px; overflow-y: scroll; padding: 10px; margin-bottom: 10px; background: #fafafa; border-radius: 4px; }
-        .message { margin-bottom: 10px; padding: 8px; border-radius: 4px; background: #e9ecef; }
-        .message .meta { font-size: 0.8em; color: #666; margin-bottom: 4px; }
-        .system { text-align: center; color: #888; font-style: italic; font-size: 0.9em; margin: 8px 0; }
-        .flex-box { display: flex; gap: 10px; }
-        .flex-box input { flex: 1; margin-bottom: 0; }
-        .flex-box button { width: auto; margin-bottom: 0; }
+        
+        /* ログイン画面 */
+        #login-screen { max-width: 400px; margin: 100px auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); text-align: center; }
+        #login-screen input { width: 100%; padding: 12px; margin-bottom: 15px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 6px; font-size: 16px; }
+        #login-screen button { width: 100%; padding: 12px; background: #06c755; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; }
+        #login-screen button:hover { background: #05b34c; }
+
+        /* メイン画面（LINE風の2画面構成） */
+        #main-screen { display: flex; width: 100vw; height: 100vh; background: #fff; }
+        
+        /* 左側：友だち（オンラインユーザー）リスト */
+        #sidebar { width: 250px; background: #eceff1; border-right: 1px solid #cfd8dc; display: flex; flex-direction: column; }
+        #my-profile { padding: 15px; background: #2c3e50; color: white; font-weight: bold; font-size: 14px; }
+        #user-list-title { padding: 10px 15px; font-size: 12px; color: #78909c; font-weight: bold; border-bottom: 1px solid #cfd8dc; }
+        #user-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; }
+        #user-list li { padding: 15px; border-bottom: 1px solid #e0e0e0; cursor: pointer; transition: 0.2s; font-weight: 500; }
+        #user-list li:hover { background: #cfd8dc; }
+        #user-list li.active { background: #06c755; color: white; }
+
+        /* 右側：トーク画面 */
+        #chat-area { flex: 1; display: flex; flex-direction: column; background: #7493a7; }
+        #chat-header { padding: 15px; background: #ffffff; border-bottom: 1px solid #cfd8dc; font-weight: bold; font-size: 18px; }
+        #chat-box { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+        
+        /* メッセージの吹き出し（LINE風） */
+        .msg-row { display: flex; width: 100%; }
+        .msg-row.me { justify-content: flex-end; } /* 自分は右寄せ */
+        .msg-row.other { justify-content: flex-start; } /* 相手は左寄せ */
+        
+        .bubble { max-width: 60%; padding: 10px 14px; border-radius: 15px; font-size: 15px; line-height: 1.4; position: relative; word-wrap: break-word; }
+        .msg-row.me .bubble { background: #84e296; color: #000; border-top-right-radius: 2px; }
+        .msg-row.other .bubble { background: #ffffff; color: #000; border-top-left-radius: 2px; }
+        
+        .time { font-size: 11px; color: #e0e0e0; align-self: flex-end; margin: 0 5px; text-shadow: 1px 1px 1px rgba(0,0,0,0.3); }
+        .msg-row.me .time { order: -1; color: #f0f0f0; } /* 自分の時間は吹き出しの左側 */
+
+        /* フッター（入力欄） */
+        #input-area { padding: 15px; background: #ffffff; display: flex; gap: 10px; border-top: 1px solid #cfd8dc; }
+        #message-input { flex: 1; padding: 12px; border: 1px solid #ccc; border-radius: 20px; font-size: 15px; outline: none; }
+        #send-btn { padding: 10px 20px; background: #06c755; color: white; border: none; border-radius: 20px; cursor: pointer; font-weight: bold; }
+        #send-btn:hover { background: #05b34c; }
+        #no-chat-placeholder { flex: 1; display: flex; justify-content: center; align-items: center; color: #ffffff; font-size: 18px; font-weight: bold; text-shadow: 1px 1px 2px rgba(0,0,0,0.5); }
     </style>
 </head>
 <body>
 
-<div class="container">
     <!-- 1. ログイン画面 -->
     <div id="login-screen">
-        <h2>⚔ チャットを始めよう</h2>
-        <input type="text" id="username" placeholder="ユーザー名を入力してください" required>
-        <select id="room">
-            <option value="ロビー">ロビー（全体雑談）</option>
-            <option value="初心者街">初心者街</option>
-            <option value="ダンジョンエリア">ダンジョンエリア</option>
-        </select>
-        <button id="join-btn">入室する</button>
+        <h2>💬 LINE風 チャット</h2>
+        <input type="text" id="username-input" placeholder="ユーザーID（半角英語や名前）" required>
+        <button id="login-btn">ログイン</button>
     </div>
 
-    <!-- 2. チャット画面 -->
-    <div id="chat-screen" class="hidden">
-        <h2 id="room-title">部屋: </h2>
-        <div id="chat-box"></div>
-        <div class="flex-box">
-            <input type="text" id="message-input" placeholder="メッセージを入力...">
-            <button id="send-btn">送信</button>
+    <!-- 2. メイン画面 -->
+    <div id="main-screen" class="hidden">
+        <!-- 左側サイドバー -->
+        <div id="sidebar">
+            <div id="my-profile">マイID: <span id="my-id-display"></span></div>
+            <div id="user-list-title">オンラインの友だち</div>
+            <ul id="user-list"></ul>
+        </div>
+
+        <!-- 右側チャットエリア（最初は案内を表示） -->
+        <div id="no-chat-placeholder">👈 左のリストから話したい友だちを選んでね</div>
+        
+        <div id="chat-area" class="hidden">
+            <div id="chat-header">トーク相手: <span id="chat-partner-name"></span></div>
+            <div id="chat-box"></div>
+            <div id="input-area">
+                <input type="text" id="message-input" placeholder="メッセージを入力...">
+                <button id="send-btn">送信</button>
+            </div>
         </div>
     </div>
-</div>
 
-<script src="/socket.io/socket.io.js"></script>
-<script>
-    const socket = io();
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        
+        let myUsername = '';
+        let activePartner = ''; // 現在チャットを開いている相手のID
+        const chatLogs = {}; // 過去ログをローカルで一時保存 { 相手のID: [メッセージの配列] }
 
-    const loginScreen = document.getElementById('login-screen');
-    const chatScreen = document.getElementById('chat-screen');
-    const usernameInput = document.getElementById('username');
-    const roomSelect = document.getElementById('room');
-    const joinBtn = document.getElementById('join-btn');
-    const roomTitle = document.getElementById('room-title');
-    const chatBox = document.getElementById('chat-box');
-    const messageInput = document.getElementById('message-input');
-    const sendBtn = document.getElementById('send-btn');
+        // ログイン処理
+        document.getElementById('login-btn').addEventListener('click', () => {
+            const username = document.getElementById('username-input').value.trim();
+            if (!username) return alert('ユーザーIDを入力してください');
+            socket.emit('login', username);
+        });
 
-    let currentUsername = '';
+        socket.on('loginResult', (data) => {
+            if (data.success) {
+                myUsername = data.username;
+                document.getElementById('my-id-display').innerText = myUsername;
+                document.getElementById('login-screen').classList.add('hidden');
+                document.getElementById('main-screen').classList.remove('hidden');
+            } else {
+                alert(data.message);
+            }
+        });
 
-    joinBtn.addEventListener('click', () => {
-        const username = usernameInput.value.trim();
-        const room = roomSelect.value;
+        // 友だちリストの更新
+        socket.on('userList', (userArray) => {
+            const userListUl = document.getElementById('user-list');
+            userListUl.innerHTML = '';
 
-        if (!username) return alert('ユーザー名を入力してください！');
+            userArray.forEach(user => {
+                if (user === myUsername) return; // 自分はリストに表示しない
 
-        currentUsername = username;
-        roomTitle.innerText = `部屋: ${room} (ユーザー: ${username})`;
+                const li = document.createElement('li');
+                li.innerText = user;
+                if (user === activePartner) li.classList.add('active');
 
-        loginScreen.classList.add('hidden');
-        chatScreen.classList.remove('hidden');
+                // 友だちをクリックしたときにトーク画面を開く
+                li.addEventListener('click', () => {
+                    switchChatPartner(user);
+                    // アクティブな見た目の切り替え
+                    document.querySelectorAll('#user-list li').forEach(el => el.classList.remove('active'));
+                    li.classList.add('active');
+                });
+                userListUl.appendChild(li);
+            });
+            
+            // もしチャット中の相手がログアウトしたらトークを閉じる
+            if (activePartner && !userArray.includes(activePartner)) {
+                alert(`${activePartner} がログアウトしました。`);
+                location.reload();
+            }
+        });
 
-        socket.emit('joinRoom', { username, room });
-    });
-
-    function sendMessage() {
-        const text = messageInput.value.trim();
-        if (text) {
-            socket.emit('chatMessage', text);
-            messageInput.value = '';
-            messageInput.focus();
+        // トーク相手を切り替える処理
+        function switchChatPartner(partnerName) {
+            activePartner = partnerName;
+            document.getElementById('no-chat-placeholder').classList.add('hidden');
+            document.getElementById('chat-area').classList.remove('hidden');
+            document.getElementById('chat-partner-name').innerText = partnerName;
+            
+            // 画面をクリアして、その相手との過去ログを再描画
+            const chatBox = document.getElementById('chat-box');
+            chatBox.innerHTML = '';
+            
+            if (chatLogs[partnerName]) {
+                chatLogs[partnerName].forEach(msg => renderMessage(msg));
+            }
+            chatBox.scrollTop = chatBox.scrollHeight;
         }
-    }
-    sendBtn.addEventListener('click', sendMessage);
-    messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
 
-    socket.on('chatMessage', (data) => {
-        const div = document.createElement('div');
-        div.classList.add('message');
-        div.innerHTML = `<div class="meta">${data.username} <span>[${data.time}]</span></div><div>${data.text}</div>`;
-        chatBox.appendChild(div);
-        chatBox.scrollTop = chatBox.scrollHeight;
-    });
+        // メッセージを画面に描画する
+        function renderMessage(msg) {
+            const chatBox = document.getElementById('chat-box');
+            const row = document.createElement('div');
+            row.classList.add('msg-row');
+            
+            // 自分が送ったか、相手が送ったかでデザイン（左右）を分ける
+            if (msg.fromUser === myUsername) {
+                row.classList.add('me');
+            } else {
+                row.classList.add('other');
+            }
 
-    socket.on('systemMessage', (text) => {
-        const div = document.createElement('div');
-        div.classList.add('system');
-        div.innerText = text;
-        chatBox.appendChild(div);
-        chatBox.scrollTop = chatBox.scrollHeight;
-    });
-</script>
+            row.innerHTML = `<div class="bubble">${msg.text}</div><div class="time">${msg.time}</div>`;
+            chatBox.appendChild(row);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        // メッセージ送信
+        function sendPrivateMessage() {
+            const input = document.getElementById('message-input');
+            const text = input.value.trim();
+            if (!text || !activePartner) return;
+
+            socket.emit('privateMessage', { toUser: activePartner, text: text });
+            input.value = '';
+            input.focus();
+        }
+
+        document.getElementById('send-btn').addEventListener('click', sendPrivateMessage);
+        document.getElementById('message-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendPrivateMessage();
+        });
+
+        // メッセージを受信したときの処理
+        socket.on('receivePrivateMessage', (msg) => {
+            // メッセージの当事者（送り手か受け手）のIDをログのキーにする
+            const partner = (msg.fromUser === myUsername) ? msg.toUser : msg.fromUser;
+            
+            if (!chatLogs[partner]) {
+                chatLogs[partner] = [];
+            }
+            chatLogs[partner].push(msg);
+
+            // 現在開いているトーク相手からのメッセージ（または自分の送信分）なら画面に出す
+            if (partner === activePartner) {
+                renderMessage(msg);
+            } else {
+                // 開いていない相手から届いたら、分かりやすいようにアラートを出す（LINEの通知の代わり）
+                alert(`📩 ${msg.fromUser} から新着メッセージ: "${msg.text}"`);
+            }
+        });
+    </script>
 </body>
 </html>
