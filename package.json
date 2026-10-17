@@ -1,7 +1,7 @@
 {
-  "name": "line-like-private-chat",
+  "name": "my-chat-family",
   "version": "1.0.0",
-  "description": "A private 1-on-1 chat application",
+  "description": "LINE-like chat application",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
