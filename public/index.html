@@ -5,197 +5,225 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LINE風 チャット</title>
     <style>
-        body { font-family: sans-serif; margin: 0; padding: 0; background: #cbd4e1; overflow: hidden; }
-        .hidden { display: none !important; }
-        #login-screen { max-width: 400px; margin: 100px auto; background: white; padding: 30px; border-radius: 10px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        #login-screen input, #login-screen button { width: 100%; padding: 12px; margin-bottom: 15px; box-sizing: border-box; border-radius: 6px; font-size: 16px; }
-        #login-screen button { background: #06c755; color: white; border: none; font-weight: bold; cursor: pointer; }
-        #main-screen { display: flex; width: 100vw; height: 100vh; background: #fff; }
-        #sidebar { width: 250px; background: #eceff1; border-right: 1px solid #cfd8dc; display: flex; flex-direction: column; }
-        #my-profile { padding: 15px; background: #2c3e50; color: white; display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
-        #logout-btn { background: #e74c3c; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; }
-        #add-friend-form { padding: 10px; display: flex; gap: 5px; background: #fff; border-bottom: 1px solid #cfd8dc; }
-        #add-friend-form input { flex: 1; padding: 6px; border: 1px solid #ccc; border-radius: 4px; }
-        #add-friend-form button { padding: 6px 10px; background: #2c3e50; color: white; border: none; border-radius: 4px; cursor: pointer; }
-        #user-list-title { padding: 10px 15px; font-size: 12px; color: #78909c; font-weight: bold; }
-        #user-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; }
-        #user-list li { padding: 15px; border-bottom: 1px solid #e0e0e0; cursor: pointer; display: flex; justify-content: space-between; }
-        #user-list li.active { background: #06c755; color: white; }
-        .status-dot { font-size: 11px; color: #888; }
-        .status-dot.online { color: #06c755; font-weight: bold; }
-        li.active .status-dot.online { color: #fff; }
-        #chat-area { flex: 1; display: flex; flex-direction: column; background: #7493a7; }
-        #chat-header { padding: 15px; background: #ffffff; border-bottom: 1px solid #cfd8dc; font-weight: bold; }
-        #chat-box { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
-        .msg-row { display: flex; width: 100%; }
-        .msg-row.me { justify-content: flex-end; }
-        .msg-row.other { justify-content: flex-start; }
-        .bubble { max-width: 60%; padding: 10px 14px; border-radius: 15px; font-size: 15px; word-wrap: break-word; }
-        .msg-row.me .bubble { background: #84e296; border-top-right-radius: 2px; }
-        .msg-row.other .bubble { background: #ffffff; border-top-left-radius: 2px; }
-        .time { font-size: 11px; color: #666; align-self: flex-end; margin: 0 5px; }
-        #input-area { padding: 15px; background: #ffffff; display: flex; gap: 10px; }
-        #message-input { flex: 1; padding: 12px; border: 1px solid #ccc; border-radius: 20px; outline: none; }
-        #send-btn { padding: 10px 20px; background: #06c755; color: white; border: none; border-radius: 20px; font-weight: bold; cursor: pointer; }
-        #no-chat-placeholder { flex: 1; display: flex; justify-content: center; align-items: center; color: #ffffff; font-size: 18px; font-weight: bold; }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Helvetica Neue', Arial, sans-serif; }
+        body { background-color: #7494c0; display: flex; height: 100vh; }
+        
+        /* サイドバー（ユーザー一覧） */
+        #sidebar { width: 250px; background-color: #ffffff; border-right: 1px solid #ddd; display: flex; flex-direction: column; }
+        #login-area { padding: 15px; border-bottom: 1px solid #eee; background-color: #f6f6f6; }
+        #login-area input { width: 100%; padding: 8px; margin-bottom: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        #login-area button { width: 100%; padding: 8px; background-color: #06c755; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; }
+        #login-area button:hover { background-color: #05b34c; }
+        #user-info { display: none; padding: 10px; background-color: #e8f5e9; border-radius: 4px; margin-bottom: 5px; font-size: 14px; }
+        #logout-btn { background-color: #e53935 !important; margin-top: 5px; }
+        
+        #room-list-title { padding: 10px 15px; font-size: 12px; color: #777; font-weight: bold; }
+        #user-list { list-style: none; overflow-y: auto; flex: 1; }
+        #user-list li { padding: 12px 15px; cursor: pointer; border-bottom: 1px solid #f9f9f9; font-size: 15px; transition: 0.2s; }
+        #user-list li:hover { background-color: #f0f0f0; }
+        #user-list li.active { background-color: #e2f0d9; font-weight: bold; }
+
+        /* チャットエリア */
+        #chat-area { flex: 1; display: flex; flex-direction: column; background-color: #7494c0; }
+        #chat-header { background-color: #ffffff; padding: 15px; font-size: 16px; font-weight: bold; border-bottom: 1px solid #ddd; }
+        #chat-messages { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+        
+        /* 吹き出しのスタイル */
+        .msg { display: flex; flex-direction: column; max-width: 70%; font-size: 14px; }
+        .msg .sender { font-size: 11px; color: #fff; margin-bottom: 2px; }
+        .msg .text { padding: 8px 12px; border-radius: 12px; word-break: break-all; position: relative; }
+        .msg .time { font-size: 10px; color: #eee; margin-top: 2px; align-self: flex-end; }
+        
+        /* 自分からのメッセージ */
+        .msg.me { align-self: flex-end; }
+        .msg.me .sender { display: none; }
+        .msg.me .text { background-color: #53b642; color: #fff; border-top-right-radius: 2px; }
+        .msg.me .time { color: #dfdfdf; }
+        
+        /* 相手からのメッセージ */
+        .msg.other { align-self: flex-start; }
+        .msg.other .text { background-color: #ffffff; color: #000; border-top-left-radius: 2px; }
+        .msg.other .time { color: #555; align-self: flex-start; }
+
+        /* フッター（入力欄） */
+        #chat-footer { padding: 10px; background-color: #ffffff; display: flex; gap: 10px; }
+        #chat-footer input { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 4px; outline: none; }
+        #chat-footer button { padding: 10px 20px; background-color: #06c755; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; }
+        #chat-footer button:disabled { background-color: #cccccc; cursor: not-allowed; }
+        
+        .placeholder-text { text-align: center; color: #fff; margin-top: 40vh; font-size: 16px; }
     </style>
+    <!-- Socket.ioのクライアントライブラリを読み込み -->
+    <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
 
-    <div id="login-screen">
-        <h2>💬 LINE風 チャット (自動ログイン)</h2>
-        <input type="text" id="username-input" placeholder="ユーザーIDを入力" required>
-        <button id="login-btn">ログイン</button>
-    </div>
-
-    <div id="main-screen" class="hidden">
-        <div id="sidebar">
-            <div id="my-profile">
-                <div>マイID: <span id="my-id-display"></span></div>
-                <button id="logout-btn">ログアウト</button>
+    <!-- サイドバー -->
+    <div id="sidebar">
+        <!-- ログイン・マイIDエリア -->
+        <div id="login-area">
+            <div id="login-form">
+                <input type="text" id="user-id-input" placeholder="マイIDを入力してね">
+                <button id="login-btn" onclick="login()">ログイン</button>
             </div>
-            <div id="add-friend-form">
-                <input type="text" id="friend-id-input" placeholder="話したい相手のID">
-                <button id="add-friend-btn">トーク開始</button>
-            </div>
-            <div id="user-list-title">トークルーム一覧</div>
-            <ul id="user-list"></ul>
-        </div>
-        <div id="no-chat-placeholder">👈 話したい相手のIDを入力するか、リストから選んでね</div>
-        <div id="chat-area" class="hidden">
-            <div id="chat-header">トーク相手: <span id="chat-partner-name"></span></div>
-            <div id="chat-box"></div>
-            <div id="input-area">
-                <input type="text" id="message-input" placeholder="メッセージを入力...">
-                <button id="send-btn">送信</button>
+            <div id="user-info">
+                <div>マイID: <span id="my-id-display" style="font-weight: bold;"></span></div>
+                <button id="logout-btn" onclick="logout()">ログアウト</button>
             </div>
         </div>
+
+        <div id="room-list-title">トークルーム一覧</div>
+        <ul id="user-list">
+            <!-- オンラインのユーザーがここに並びます -->
+        </ul>
     </div>
 
-    <script src="/socket.io/socket.io.js"></script>
+    <!-- チャットメインエリア -->
+    <div id="chat-area">
+        <div id="chat-header">👈 左のリストから話したい相手を選んでね</div>
+        <div id="chat-messages">
+            <div class="placeholder-text">チャットを始めるにはログインしてください</div>
+        </div>
+        <div id="chat-footer">
+            <input type="text" id="message-input" placeholder="メッセージを入力..." disabled onkeypress="handleKeyPress(event)">
+            <button id="send-btn" onclick="sendMessage()" disabled>送信</button>
+        </div>
+    </div>
+
     <script>
-        const socket = io({ transports: ['websocket', 'polling'] });
-        let myUsername = '', activePartner = '', chatLogs = {}, onlineUsersList = [];
+        // サーバーに接続
+        const socket = io();
+        let myId = '';
+        let activeChatUser = '';
 
-        window.addEventListener('DOMContentLoaded', () => {
-            const savedUsername = localStorage.getItem('chat_my_id');
-            if (savedUsername) socket.emit('login', savedUsername);
-        });
-
-        document.getElementById('login-btn').addEventListener('click', () => {
-            const username = document.getElementById('username-input').value.trim();
-            if (!username) return alert('ユーザーIDを入力してください');
-            socket.emit('login', username);
-        });
-
-        socket.on('loginResult', (data) => {
-            if (data.success) {
-                myUsername = data.username;
-                localStorage.setItem('chat_my_id', myUsername);
-                document.getElementById('my-id-display').innerText = myUsername;
-                document.getElementById('login-screen').classList.add('hidden');
-                document.getElementById('main-screen').classList.remove('hidden');
-            } else {
-                alert(data.message);
-                localStorage.removeItem('chat_my_id');
+        // ログインを実行する関数
+        function login() {
+            const input = document.getElementById('user-id-input');
+            const id = input.value.trim();
+            if (!id) {
+                alert('IDを入力してください！');
+                return;
             }
+            // サーバーにログインシグナルを送る
+            socket.emit('login', id);
+        }
+
+        // サーバーからログイン成功を受け取った時の処理
+        socket.on('login_success', (id) => {
+            myId = id;
+            document.getElementById('login-form').style.display = 'none';
+            document.getElementById('user-info').style.display = 'block';
+            document.getElementById('my-id-display').textContent = id;
+            
+            document.getElementById('message-input').disabled = false;
+            document.getElementById('send-btn').disabled = false;
+            document.getElementById('chat-messages').innerHTML = '<div class="placeholder-text">話したい相手をリストから選んでトークを開始してね</div>';
         });
 
-        document.getElementById('logout-btn').addEventListener('click', () => {
-            if (confirm('ログアウトしますか？')) {
-                localStorage.removeItem('chat_my_id');
-                location.reload();
-            }
-        });
+        // オンラインユーザーの一覧が更新された時
+        socket.on('user_list', (userList) => {
+            const listElement = document.getElementById('user-list');
+            listElement.innerHTML = '';
 
-        socket.on('loadChatHistory', (history) => {
-            chatLogs = {};
-            history.forEach(msg => {
-                const partner = (msg.fromUser === myUsername) ? msg.toUser : msg.fromUser;
-                if (!chatLogs[partner]) chatLogs[partner] = [];
-                chatLogs[partner].push(msg);
-            });
-            updateSidebarList(); 
-        });
+            userList.forEach(userId => {
+                // 自分自身はリストに表示しない
+                if (userId === myId) return;
 
-        socket.on('userList', (userArray) => {
-            onlineUsersList = userArray;
-            updateSidebarList();
-        });
-
-        document.getElementById('add-friend-btn').addEventListener('click', () => {
-            const friendId = document.getElementById('friend-id-input').value.trim();
-            if (!friendId) return alert('相手のIDを入力してください');
-            if (friendId === myUsername) return alert('自分自身とはチャットできません');
-            if (!chatLogs[friendId]) chatLogs[friendId] = []; 
-            updateSidebarList();
-            switchChatPartner(friendId);
-            document.getElementById('friend-id-input').value = '';
-        });
-
-        function updateSidebarList() {
-            const userListEl = document.getElementById('user-list');
-            userListEl.innerHTML = '';
-            Object.keys(chatLogs).forEach(partner => {
                 const li = document.createElement('li');
-                li.innerText = partner;
-                if (partner === activePartner) li.classList.add('active');
-                const isOnline = onlineUsersList.includes(partner);
-                const dot = document.createElement('span');
-                dot.className = 'status-dot ' + (isOnline ? 'online' : '');
-                dot.innerText = isOnline ? ' ● 接続中' : ' ○ 離席中';
-                li.appendChild(dot);
-                li.addEventListener('click', () => switchChatPartner(partner));
-                userListEl.appendChild(li);
+                li.textContent = userId;
+                if (userId === activeChatUser) {
+                    li.classList.add('active');
+                }
+                // クリックしたらその人とチャットを開始
+                li.onclick = () => selectUser(userId, li);
+                listElement.appendChild(li);
             });
-        }
-
-        function switchChatPartner(partner) {
-            activePartner = partner;
-            document.getElementById('no-chat-placeholder').classList.add('hidden');
-            document.getElementById('chat-area').classList.remove('hidden');
-            document.getElementById('chat-partner-name').innerText = partner;
-            updateSidebarList();
-            renderMessages();
-        }
-
-        function renderMessages() {
-            const chatBox = document.getElementById('chat-box');
-            chatBox.innerHTML = '';
-            const logs = chatLogs[activePartner] || [];
-            logs.forEach(msg => {
-                const isMe = (msg.fromUser === myUsername);
-                const row = document.createElement('div');
-                row.className = `msg-row ${isMe ? 'me' : 'other'}`;
-                const bubble = document.createElement('div');
-                bubble.className = 'bubble';
-                bubble.innerText = msg.text;
-                const timeSpan = document.createElement('span');
-                timeSpan.className = 'time';
-                timeSpan.innerText = msg.time || '';
-                row.appendChild(bubble);
-                row.appendChild(timeSpan);
-                chatBox.appendChild(row);
-            });
-            chatBox.scrollTop = chatBox.scrollHeight;
-        }
-
-        document.getElementById('send-btn').addEventListener('click', sendMessage);
-        document.getElementById('message-input').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') sendMessage();
+            
+            // チャット相手がログアウトした場合はヘッダーを戻す
+            if (activeChatUser && !userList.includes(activeChatUser)) {
+                document.getElementById('chat-header').textContent = `${activeChatUser} さんはオフラインになりました`;
+                activeChatUser = '';
+            }
         });
 
+        // チャットする相手を選択した時
+        function selectUser(userId, element) {
+            activeChatUser = userId;
+            
+            // アクティブなスタイルの切り替え
+            document.querySelectorAll('#user-list li').forEach(li => li.classList.remove('active'));
+            element.classList.add('active');
+
+            document.getElementById('chat-header').textContent = `トーク相手: ${userId}`;
+            document.getElementById('chat-messages').innerHTML = ''; // 画面をクリア
+        }
+
+        // メッセージを送信する関数
         function sendMessage() {
             const input = document.getElementById('message-input');
-            const text = input.value.trim();
-            if (!text || !activePartner) return;
-socket.emit('privateMessage', { toUser: activePartner, text: text });
-input.value = '';
-}
-socket.on('receivePrivateMessage', (msg) => {
-const partner = (msg.fromUser === myUsername) ? msg.toUser : msg.fromUser;
-if (!chatLogs[partner]) chatLogs[partner] = [];
-chatLogs[partner].push(msg);
-updateSidebarList();
-if (partner === activePartner) renderMessages();
-});
+            const message = input.value.trim();
+            
+            if (!activeChatUser) {
+                alert('トーク相手を一覧から選んでください！');
+                return;
+            }
+            if (!message) return;
+
+            // サーバーにメッセージを送信
+            socket.emit('send_message', {
+                to: activeChatUser,
+                message: message
+            });
+
+            input.value = '';
+        }
+
+        // エンターキーでも送信できるようにする
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+
+        // メッセージを受信した時の処理
+        socket.on('receive_message', (data) => {
+            // 自分宛て、または自分が送ったメッセージで、かつ現在開いているトーク相手とのやり取りの場合のみ画面に表示
+            if ((data.from === activeChatUser && activeChatUser) || data.from === myId) {
+                const messagesContainer = document.getElementById('chat-messages');
+                
+                // プレースホルダーの文字を消す
+                const placeholder = messagesContainer.querySelector('.placeholder-text');
+                if (placeholder) placeholder.remove();
+
+                const msgDiv = document.createElement('div');
+                msgDiv.classList.add('msg');
+                // 自分が送ったか相手が送ったかでクラスを分岐
+                msgDiv.classList.add(data.from === myId ? 'me' : 'other');
+
+                msgDiv.innerHTML = `
+                    <div class="sender">${data.from}</div>
+                    <div class="text">${data.message}</div>
+                    <div class="time">${data.timestamp}</div>
+                `;
+
+                messagesContainer.appendChild(msgDiv);
+                // 一番下まで自動スクロール
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }
+        });
+
+        // ログアウト処理
+        function logout() {
+            socket.emit('logout');
+            myId = '';
+            activeChatUser = '';
+            document.getElementById('login-form').style.display = 'block';
+            document.getElementById('user-info').style.display = 'none';
+            document.getElementById('user-id-input').value = '';
+            document.getElementById('user-list').innerHTML = '';
+            
+            document.getElementById('message-input').disabled = true;
+            document.getElementById('send-btn').disabled = true;
+            document.getElementById('chat-header').textContent = '👈 左のリストから話したい相手を選んでね';
+            document.getElementById('chat-messages').innerHTML = '<div class="placeholder-text">チャットを始めるにはログインしてください</div>';
+        }
