@@ -86,6 +86,16 @@
         let myId = '';
         let activeChatUser = '';
 
+        // 💡 画面が開かれたときに自動で実行される処理
+        socket.on('connect', () => {
+            // ブラウザの記憶（localStorage）から、以前ログインしたIDがあるか探す
+            const savedId = localStorage.getItem('chat_my_id');
+            if (savedId) {
+                // 記憶があれば、そのIDを使って自動ログインをサーバーに要求する
+                socket.emit('login', savedId);
+            }
+        });
+
         function login() {
             const input = document.getElementById('user-id-input');
             const id = input.value.trim();
@@ -93,27 +103,38 @@
                 alert('IDを入力してください！');
                 return;
             }
+            // 💡 ログイン成功時に記憶できるよう、一旦ここで仮保存
+            localStorage.setItem('chat_my_id', id);
             socket.emit('login', id);
         }
 
         socket.on('login_success', (id) => {
             myId = id;
+            // 💡 サーバー側でも無事にログインが承認されたら記憶を確定
+            localStorage.setItem('chat_my_id', id);
+
             document.getElementById('login-form').style.display = 'none';
             document.getElementById('user-info').style.display = 'block';
             document.getElementById('my-id-display').textContent = id;
             
             document.getElementById('message-input').disabled = false;
             document.getElementById('send-btn').disabled = false;
-            document.getElementById('chat-messages').innerHTML = '<div class="placeholder-text">話したい相手をリストから選んでトークを開始してね</div>';
+            
+            // 相手をまだ選んでいない場合のみ初期テキストを表示
+            if (!activeChatUser) {
+                document.getElementById('chat-messages').innerHTML = '<div class="placeholder-text">話したい相手をリストから選んでトークを開始してね</div>';
+            } else {
+                // 自動再ログインなどで、すでに相手を選んでいた場合は履歴を再読込
+                socket.emit('get_history', { myId: myId, withId: activeChatUser });
+            }
         });
 
-        // 登録されている全ユーザーの一覧を受け取る
         socket.on('user_list', (userList) => {
             const listElement = document.getElementById('user-list');
             listElement.innerHTML = '';
 
             userList.forEach(userId => {
-                if (userId === myId) return; // 自分は表示しない
+                if (userId === myId) return;
 
                 const li = document.createElement('li');
                 li.textContent = userId;
@@ -125,21 +146,18 @@
             });
         });
 
-        // チャット相手を切り替えたとき
         function selectUser(userId, element) {
             activeChatUser = userId;
             document.querySelectorAll('#user-list li').forEach(li => li.classList.remove('active'));
             element.classList.add('active');
             document.getElementById('chat-header').textContent = `トーク相手: ${userId}`;
             
-            // 💡 サーバーに「この人との過去の履歴をください」とリクエストする
             socket.emit('get_history', { myId: myId, withId: userId });
         }
 
-        // 💡 サーバーから送られてきた過去の履歴を画面に描画する処理
         socket.on('load_history', (history) => {
             const messagesContainer = document.getElementById('chat-messages');
-            messagesContainer.innerHTML = ''; // 画面を一度クリア
+            messagesContainer.innerHTML = '';
 
             if (history.length === 0) {
                 messagesContainer.innerHTML = '<div class="placeholder-text" style="color:#eee;">まだメッセージはありません。トークを始めてみよう！</div>';
@@ -175,7 +193,6 @@
             }
         }
 
-        // 画面に吹き出しを追加する共通関数
         function appendMessageToScreen(data) {
             const messagesContainer = document.getElementById('chat-messages');
             const placeholder = messagesContainer.querySelector('.placeholder-text');
@@ -194,28 +211,28 @@
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }
 
-        // 新しいメッセージを受信したとき
         socket.on('receive_message', (data) => {
-            // 現在その相手とのトーク画面を開いている場合のみ、画面にリアルタイム追加する
             if ((data.from === activeChatUser && activeChatUser) || data.from === myId) {
                 appendMessageToScreen(data);
             }
         });
 
         function logout() {
+            // 💡 ログアウトボタンが押されたらブラウザの記憶を完全に消去する
+            localStorage.removeItem('chat_my_id');
+
             socket.emit('logout');
             myId = '';
             activeChatUser = '';
             document.getElementById('login-form').style.display = 'block';
-            document.getElementById('user-info').style.display = 'none';
-            document.getElementById('user-id-input').value = '';
-            document.getElementById('user-list').innerHTML = '';
-            
-            document.getElementById('message-input').disabled = true;
-            document.getElementById('send-btn').disabled = true;
-            document.getElementById('chat-header').textContent = '👈 左のリストから話したい相手を選んでね';
-            document.getElementById('chat-messages').innerHTML = '<div class="placeholder-text">チャットを始めるにはログインしてください</div>';
-        }
+document.getElementById('user-info').style.display = 'none';
+document.getElementById('user-id-input').value = '';
+document.getElementById('user-list').innerHTML = '';
+document.getElementById('message-input').disabled = true;
+document.getElementById('send-btn').disabled = true;
+document.getElementById('chat-header').textContent = '👈 左のリストから話したい相手を選んでね';
+document.getElementById('chat-messages').innerHTML = 'チャットを始めるにはログインしてください';
+} 
     </script>
 </body>
 </html>
