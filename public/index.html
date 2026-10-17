@@ -70,17 +70,14 @@
         </div>
     </div>
 
-    <!-- 通信ライブラリを一番下で確実に読み込む -->
     <script src="/socket.io/socket.io.js"></script>
 
     <script>
-        // エラーが起きたら画面にポップアップを出す設定
         window.onerror = function(message, source, lineno, colno, error) {
             alert("エラーが発生しました:\n" + message + "\n行番号: " + lineno);
             return false;
         };
 
-        // Socket.ioが正しく読み込めているかチェック
         if (typeof io === 'undefined') {
             alert("警告: サーバーから通信ライブラリ(Socket.io)を読み込めませんでした。Render側の反映が終わっていない可能性があります。");
         }
@@ -90,17 +87,13 @@
         let activeChatUser = '';
 
         function login() {
-            try {
-                const input = document.getElementById('user-id-input');
-                const id = input.value.trim();
-                if (!id) {
-                    alert('IDを入力してください！');
-                    return;
-                }
-                socket.emit('login', id);
-            } catch (e) {
-                alert("ログインボタンの処理でエラー: " + e.message);
+            const input = document.getElementById('user-id-input');
+            const id = input.value.trim();
+            if (!id) {
+                alert('IDを入力してください！');
+                return;
             }
+            socket.emit('login', id);
         }
 
         socket.on('login_success', (id) => {
@@ -114,12 +107,13 @@
             document.getElementById('chat-messages').innerHTML = '<div class="placeholder-text">話したい相手をリストから選んでトークを開始してね</div>';
         });
 
+        // 登録されている全ユーザーの一覧を受け取る
         socket.on('user_list', (userList) => {
             const listElement = document.getElementById('user-list');
             listElement.innerHTML = '';
 
             userList.forEach(userId => {
-                if (userId === myId) return;
+                if (userId === myId) return; // 自分は表示しない
 
                 const li = document.createElement('li');
                 li.textContent = userId;
@@ -129,20 +123,33 @@
                 li.onclick = () => selectUser(userId, li);
                 listElement.appendChild(li);
             });
-            
-            if (activeChatUser && !userList.includes(activeChatUser)) {
-                document.getElementById('chat-header').textContent = `${activeChatUser} さんはオフラインになりました`;
-                activeChatUser = '';
-            }
         });
 
+        // チャット相手を切り替えたとき
         function selectUser(userId, element) {
             activeChatUser = userId;
             document.querySelectorAll('#user-list li').forEach(li => li.classList.remove('active'));
             element.classList.add('active');
             document.getElementById('chat-header').textContent = `トーク相手: ${userId}`;
-            document.getElementById('chat-messages').innerHTML = '';
+            
+            // 💡 サーバーに「この人との過去の履歴をください」とリクエストする
+            socket.emit('get_history', { myId: myId, withId: userId });
         }
+
+        // 💡 サーバーから送られてきた過去の履歴を画面に描画する処理
+        socket.on('load_history', (history) => {
+            const messagesContainer = document.getElementById('chat-messages');
+            messagesContainer.innerHTML = ''; // 画面を一度クリア
+
+            if (history.length === 0) {
+                messagesContainer.innerHTML = '<div class="placeholder-text" style="color:#eee;">まだメッセージはありません。トークを始めてみよう！</div>';
+                return;
+            }
+
+            history.forEach(data => {
+                appendMessageToScreen(data);
+            });
+        });
 
         function sendMessage() {
             const input = document.getElementById('message-input');
@@ -168,23 +175,30 @@
             }
         }
 
+        // 画面に吹き出しを追加する共通関数
+        function appendMessageToScreen(data) {
+            const messagesContainer = document.getElementById('chat-messages');
+            const placeholder = messagesContainer.querySelector('.placeholder-text');
+            if (placeholder) placeholder.remove();
+
+            const msgDiv = document.createElement('div');
+            msgDiv.classList.add('msg', data.from === myId ? 'me' : 'other');
+
+            msgDiv.innerHTML = `
+                <div class="sender">${data.from}</div>
+                <div class="text">${data.message}</div>
+                <div class="time">${data.timestamp}</div>
+            `;
+
+            messagesContainer.appendChild(msgDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        // 新しいメッセージを受信したとき
         socket.on('receive_message', (data) => {
+            // 現在その相手とのトーク画面を開いている場合のみ、画面にリアルタイム追加する
             if ((data.from === activeChatUser && activeChatUser) || data.from === myId) {
-                const messagesContainer = document.getElementById('chat-messages');
-                const placeholder = messagesContainer.querySelector('.placeholder-text');
-                if (placeholder) placeholder.remove();
-
-                const msgDiv = document.createElement('div');
-                msgDiv.classList.add('msg', data.from === myId ? 'me' : 'other');
-
-                msgDiv.innerHTML = `
-                    <div class="sender">${data.from}</div>
-                    <div class="text">${data.message}</div>
-                    <div class="time">${data.timestamp}</div>
-                `;
-
-                messagesContainer.appendChild(msgDiv);
-                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                appendMessageToScreen(data);
             }
         });
 
