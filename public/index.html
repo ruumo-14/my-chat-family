@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LINE風 プライベートチャット（履歴保存対応）</title>
+    <title>LINE風 プライベートチャット（自動ログイン対応）</title>
     <style>
         body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; margin: 0; padding: 0; background: #cbd4e1; overflow: hidden; }
         .hidden { display: none !important; }
@@ -14,10 +14,14 @@
 
         #main-screen { display: flex; width: 100vw; height: 100vh; background: #fff; }
         #sidebar { width: 250px; background: #eceff1; border-right: 1px solid #cfd8dc; display: flex; flex-direction: column; }
-        #my-profile { padding: 15px; background: #2c3e50; color: white; font-weight: bold; font-size: 14px; }
+        
+        /* ログアウトボタン用の調整 */
+        #my-profile { padding: 15px; background: #2c3e50; color: white; font-weight: bold; font-size: 14px; display: flex; justify-content: space-between; align-items: center; }
+        #logout-btn { background: #e74c3c; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; }
+        #logout-btn:hover { background: #c0392b; }
+
         #user-list-title { padding: 10px 15px; font-size: 12px; color: #78909c; font-weight: bold; border-bottom: 1px solid #cfd8dc; }
         
-        /* 履歴を残すために友だちは常に入力してトークできるように手動追加フォームを設置 */
         #add-friend-form { padding: 10px; display: flex; gap: 5px; background: #fff; border-bottom: 1px solid #cfd8dc; }
         #add-friend-form input { flex: 1; padding: 6px; border: 1px solid #ccc; border-radius: 4px; }
         #add-friend-form button { padding: 6px 10px; background: #2c3e50; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; }
@@ -51,17 +55,22 @@
 </head>
 <body>
 
+    <!-- 1. ログイン画面 -->
     <div id="login-screen">
-        <h2>💬 LINE風 チャット (履歴保存版)</h2>
+        <h2>💬 LINE風 チャット (自動ログイン)</h2>
         <input type="text" id="username-input" placeholder="ユーザーIDを入力（例: taro）" required>
         <button id="login-btn">ログイン</button>
     </div>
 
+    <!-- 2. メイン画面 -->
     <div id="main-screen" class="hidden">
         <div id="sidebar">
-            <div id="my-profile">マイID: <span id="my-id-display"></span></div>
+            <div id="my-profile">
+                <div>マイID: <span id="my-id-display"></span></div>
+                <!-- ログアウトボタン（保存されたIDを消すために必要） -->
+                <button id="logout-btn">ログアウト</button>
+            </div>
             
-            <!-- トークしたい相手をIDで直接追加できる機能 -->
             <div id="add-friend-form">
                 <input type="text" id="friend-id-input" placeholder="話したい相手のID">
                 <button id="add-friend-btn">トーク開始</button>
@@ -89,28 +98,52 @@
         
         let myUsername = '';
         let activePartner = ''; 
-        let chatLogs = {};      // サーバーから読み込んだ過去ログ { 相手のID: [メッセージの配列] }
-        let onlineUsersList = []; // 今現在オンラインの人のリスト
+        let chatLogs = {};      
+        let onlineUsersList = [];
 
-        // ログイン
+        // ★自動ログインの判定：ページを開いた時に、ブラウザの記憶（localStorage）をチェックする
+        window.addEventListener('DOMContentLoaded', () => {
+            const savedUsername = localStorage.getItem('chat_my_id');
+            if (savedUsername) {
+                // 記憶があれば、自動でログイン命令をサーバーに送る
+                socket.emit('login', savedUsername);
+            }
+        });
+
+        // ログインボタンを押した時
         document.getElementById('login-btn').addEventListener('click', () => {
             const username = document.getElementById('username-input').value.trim();
             if (!username) return alert('ユーザーIDを入力してください');
             socket.emit('login', username);
         });
 
+        // ログイン結果の受信
         socket.on('loginResult', (data) => {
             if (data.success) {
                 myUsername = data.username;
+                
+                // ★重要：ログイン成功時、ブラウザにこのIDを記憶させる
+                localStorage.setItem('chat_my_id', myUsername);
+
                 document.getElementById('my-id-display').innerText = myUsername;
                 document.getElementById('login-screen').classList.add('hidden');
                 document.getElementById('main-screen').classList.remove('hidden');
             } else {
+                // 自動ログイン中に別人がそのIDを使っていた等のエラー用
                 alert(data.message);
+                localStorage.removeItem('chat_my_id'); // 記憶をリセット
             }
         });
 
-        // ★重要：ログイン完了時にサーバーから過去の全履歴を受け取る
+        // ★ログアウト処理：記憶を消してページをリロードする
+        document.getElementById('logout-btn').addEventListener('click', () => {
+            if (confirm('ログアウトしますか？自動ログインが解除されます。')) {
+                localStorage.removeItem('chat_my_id'); // ブラウザの記憶を削除
+                location.reload(); // ページをリロードしてログイン画面に戻す
+            }
+        });
+
+        // 過去履歴の読み込み
         socket.on('loadChatHistory', (history) => {
             chatLogs = {};
             history.forEach(msg => {
@@ -118,41 +151,39 @@
                 if (!chatLogs[partner]) chatLogs[partner] = [];
                 chatLogs[partner].push(msg);
             });
-            updateSidebarList(); // サイドバーのトークルーム一覧を更新
+            updateSidebarList(); 
         });
 
-        // サーバーからオンラインユーザー名簿が届いた時
+        // オンラインユーザーリストの更新
         socket.on('userList', (userArray) => {
             onlineUsersList = userArray;
             updateSidebarList();
         });
 
-        // 「トーク開始」ボタンでオフラインの相手とも部屋を作る
+        // トーク相手の追加
         document.getElementById('add-friend-btn').addEventListener('click', () => {
             const friendId = document.getElementById('friend-id-input').value.trim();
             if (!friendId) return alert('相手のIDを入力してください');
             if (friendId === myUsername) return alert('自分自身とはチャットできません');
             
             if (!chatLogs[friendId]) {
-                chatLogs[friendId] = []; // 新しい空のトークログを作る
+                chatLogs[friendId] = []; 
             }
             updateSidebarList();
             switchChatPartner(friendId);
             document.getElementById('friend-id-input').value = '';
         });
 
-        // 左側のトーク一覧画面をリフレッシュする
+        // サイドバー一覧の描画
         function updateSidebarList() {
             const userListUl = document.getElementById('user-list');
             userListUl.innerHTML = '';
 
-            // 過去ログが存在する全ての相手をリストに並べる
             Object.keys(chatLogs).forEach(user => {
                 const li = document.createElement('li');
                 li.innerText = user;
                 if (user === activePartner) li.classList.add('active');
 
-                // オンラインかオフラインかの判定表示
                 const isOnline = onlineUsersList.includes(user);
                 const statusSpan = document.createElement('span');
                 statusSpan.classList.add('status-dot');
@@ -171,37 +202,8 @@
             });
         }
 
-        // トーク相手を切り替える（過去ログを呼び出して画面に敷き詰める）
+        // 部屋の切り替え
         function switchChatPartner(partnerName) {
             activePartner = partnerName;
             document.getElementById('no-chat-placeholder').classList.add('hidden');
             document.getElementById('chat-area').classList.remove('hidden');
-            document.getElementById('chat-partner-name').innerText = partnerName;
-            
-            const chatBox = document.getElementById('chat-box');
-            chatBox.innerHTML = '';
-            
-            if (chatLogs[partnerName]) {
-                chatLogs[partnerName].forEach(msg => renderMessage(msg));
-            }
-            chatBox.scrollTop = chatBox.scrollHeight;
-            updateSidebarList();
-        }
-
-        function renderMessage(msg) {
-            const chatBox = document.getElementById('chat-box');
-            const row = document.createElement('div');
-            row.classList.add('msg-row');
-            
-            if (msg.fromUser === myUsername) {
-                row.classList.add('me');
-            } else {
-                row.classList.add('other');
-            }
-
-            row.innerHTML = `<div class="bubble">${msg.text}</div><div class="time">${msg.time}</div>`;
-            chatBox.appendChild(row);
-            chatBox.scrollTop = chatBox.scrollHeight;
-        }
-
-        // メッセージ送信
