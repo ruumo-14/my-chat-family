@@ -15,7 +15,6 @@
         #main-screen { display: flex; width: 100vw; height: 100vh; background: #fff; }
         #sidebar { width: 250px; background: #eceff1; border-right: 1px solid #cfd8dc; display: flex; flex-direction: column; }
         
-        /* ログアウトボタン用の調整 */
         #my-profile { padding: 15px; background: #2c3e50; color: white; font-weight: bold; font-size: 14px; display: flex; justify-content: space-between; align-items: center; }
         #logout-btn { background: #e74c3c; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; }
         #logout-btn:hover { background: #c0392b; }
@@ -67,7 +66,6 @@
         <div id="sidebar">
             <div id="my-profile">
                 <div>マイID: <span id="my-id-display"></span></div>
-                <!-- ログアウトボタン（保存されたIDを消すために必要） -->
                 <button id="logout-btn">ログアウト</button>
             </div>
             
@@ -101,49 +99,39 @@
         let chatLogs = {};      
         let onlineUsersList = [];
 
-        // ★自動ログインの判定：ページを開いた時に、ブラウザの記憶（localStorage）をチェックする
         window.addEventListener('DOMContentLoaded', () => {
             const savedUsername = localStorage.getItem('chat_my_id');
             if (savedUsername) {
-                // 記憶があれば、自動でログイン命令をサーバーに送る
                 socket.emit('login', savedUsername);
             }
         });
 
-        // ログインボタンを押した時
         document.getElementById('login-btn').addEventListener('click', () => {
             const username = document.getElementById('username-input').value.trim();
             if (!username) return alert('ユーザーIDを入力してください');
             socket.emit('login', username);
         });
 
-        // ログイン結果の受信
         socket.on('loginResult', (data) => {
             if (data.success) {
                 myUsername = data.username;
-                
-                // ★重要：ログイン成功時、ブラウザにこのIDを記憶させる
                 localStorage.setItem('chat_my_id', myUsername);
-
                 document.getElementById('my-id-display').innerText = myUsername;
                 document.getElementById('login-screen').classList.add('hidden');
                 document.getElementById('main-screen').classList.remove('hidden');
             } else {
-                // 自動ログイン中に別人がそのIDを使っていた等のエラー用
                 alert(data.message);
-                localStorage.removeItem('chat_my_id'); // 記憶をリセット
+                localStorage.removeItem('chat_my_id');
             }
         });
 
-        // ★ログアウト処理：記憶を消してページをリロードする
         document.getElementById('logout-btn').addEventListener('click', () => {
             if (confirm('ログアウトしますか？自動ログインが解除されます。')) {
-                localStorage.removeItem('chat_my_id'); // ブラウザの記憶を削除
-                location.reload(); // ページをリロードしてログイン画面に戻す
+                localStorage.removeItem('chat_my_id');
+                location.reload();
             }
         });
 
-        // 過去履歴の読み込み
         socket.on('loadChatHistory', (history) => {
             chatLogs = {};
             history.forEach(msg => {
@@ -154,13 +142,11 @@
             updateSidebarList(); 
         });
 
-        // オンラインユーザーリストの更新
         socket.on('userList', (userArray) => {
             onlineUsersList = userArray;
             updateSidebarList();
         });
 
-        // トーク相手の追加
         document.getElementById('add-friend-btn').addEventListener('click', () => {
             const friendId = document.getElementById('friend-id-input').value.trim();
             if (!friendId) return alert('相手のIDを入力してください');
@@ -174,7 +160,6 @@
             document.getElementById('friend-id-input').value = '';
         });
 
-        // サイドバー一覧の描画
         function updateSidebarList() {
             const userListUl = document.getElementById('user-list');
             userListUl.innerHTML = '';
@@ -202,8 +187,20 @@
             });
         }
 
-        // 部屋の切り替え
         function switchChatPartner(partnerName) {
             activePartner = partnerName;
             document.getElementById('no-chat-placeholder').classList.add('hidden');
             document.getElementById('chat-area').classList.remove('hidden');
+            document.getElementById('chat-partner-name').innerText = partnerName;
+            
+            const chatBox = document.getElementById('chat-box');
+            chatBox.innerHTML = '';
+            
+            if (chatLogs[partnerName]) {
+                chatLogs[partnerName].forEach(msg => renderMessage(msg));
+            }
+            chatBox.scrollTop = chatBox.scrollHeight;
+            updateSidebarList();
+        }
+
+        function renderMessage(msg) {
